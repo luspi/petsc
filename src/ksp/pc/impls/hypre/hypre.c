@@ -63,6 +63,7 @@ typedef struct {
   PetscInt  coarsentype;
   PetscInt  measuretype;
   PetscInt  smoothtype;
+  PetscInt  ilutype;
   PetscInt  smoothnumlevels;
   PetscInt  eu_level;         /* Number of levels for ILU(k) in Euclid */
   PetscReal eu_droptolerance; /* Drop tolerance for ILU(k) in Euclid */
@@ -739,7 +740,7 @@ static const char *HYPREBoomerAMGCycleType[]   = {"", "V", "W"};
 static const char *HYPREBoomerAMGCoarsenType[] = {"CLJP", "Ruge-Stueben", "", "modifiedRuge-Stueben", "", "", "Falgout", "", "PMIS", "", "HMIS"};
 static const char *HYPREBoomerAMGMeasureType[] = {"local", "global"};
 /* The following corresponds to HYPRE_BoomerAMGSetRelaxType which has many missing numbers in the enum */
-static const char *HYPREBoomerAMGSmoothType[] = {"Schwarz-smoothers", "Pilut", "ParaSails", "Euclid"};
+static const char *HYPREBoomerAMGSmoothType[] = {"RAS-ILU", "Schwarz-smoothers", "Pilut", "ParaSails", "Euclid"};
 static const char *HYPREBoomerAMGRelaxType[] = {"Jacobi", "sequential-Gauss-Seidel", "seqboundary-Gauss-Seidel", "SOR/Jacobi", "backward-SOR/Jacobi", "" /* [5] hybrid chaotic Gauss-Seidel (works only with OpenMP) */, "symmetric-SOR/Jacobi", "" /* 7 */, "l1scaled-SOR/Jacobi", "Gaussian-elimination", "" /* 10 */, "" /* 11 */, "" /* 12 */, "l1-Gauss-Seidel" /* nonsymmetric */, "backward-l1-Gauss-Seidel" /* nonsymmetric */, "CG" /* non-stationary */, "Chebyshev", "FCF-Jacobi", "l1scaled-Jacobi"};
 static const char    *HYPREBoomerAMGInterpType[] = {"classical", "", "", "direct", "multipass", "multipass-wts", "ext+i", "ext+i-cc", "standard", "standard-wts", "block", "block-wtd", "FF", "FF1", "ext", "ad-wts", "ext-mm", "ext+i-mm", "ext+e-mm"};
 static PetscErrorCode PCSetFromOptions_HYPRE_BoomerAMG(PC pc, PetscOptionItems *PetscOptionsObject)
@@ -853,9 +854,18 @@ static PetscErrorCode PCSetFromOptions_HYPRE_BoomerAMG(PC pc, PetscOptionItems *
   PetscCall(PetscOptionsEList("-pc_hypre_boomeramg_smooth_type", "Enable more complex smoothers", "None", HYPREBoomerAMGSmoothType, PETSC_STATIC_ARRAY_LENGTH(HYPREBoomerAMGSmoothType), HYPREBoomerAMGSmoothType[0], &indx, &flg));
   if (flg) {
     jac->smoothtype = indx;
-    PetscCallExternal(HYPRE_BoomerAMGSetSmoothType, jac->hsolver, indx + 6);
+    PetscCallExternal(HYPRE_BoomerAMGSetSmoothType, jac->hsolver, indx + 5);
     jac->smoothnumlevels = 25;
     PetscCallExternal(HYPRE_BoomerAMGSetSmoothNumLevels, jac->hsolver, 25);
+
+    if(indx == 0) {
+      jac->ilutype = 30;
+      PetscCallExternal(HYPRE_BoomerAMGSetILUType, jac->hsolver, 30);
+      PetscCallExternal(HYPRE_BoomerAMGSetILULevel, jac->hsolver, 0);
+      PetscCallExternal(HYPRE_BoomerAMGSetILUTriSolve, jac->hsolver, 0);
+      PetscCallExternal(HYPRE_BoomerAMGSetILULocalReordering, jac->hsolver, 0);
+    }
+
   }
 
   /* Number of smoothing levels */
@@ -1166,6 +1176,9 @@ static PetscErrorCode PCView_HYPRE_BoomerAMG(PC pc, PetscViewer viewer)
     if (jac->smoothtype != -1) {
       PetscCall(PetscViewerASCIIPrintf(viewer, "    Smooth type          %s\n", HYPREBoomerAMGSmoothType[jac->smoothtype]));
       PetscCall(PetscViewerASCIIPrintf(viewer, "    Smooth num levels    %" PetscInt_FMT "\n", jac->smoothnumlevels));
+      if(jac->ilutype != -1) {
+        PetscCall(PetscViewerASCIIPrintf(viewer, "    ILU type             %" PetscInt_FMT "\n", jac->ilutype));
+      }
     } else {
       PetscCall(PetscViewerASCIIPrintf(viewer, "    Not using more complex smoothers.\n"));
     }
@@ -2000,6 +2013,7 @@ static PetscErrorCode PCHYPRESetType_HYPRE(PC pc, const char name[])
     jac->gridsweeps[0] = jac->gridsweeps[1] = jac->gridsweeps[2] = 1;
     jac->smoothtype                                              = -1; /* Not set by default */
     jac->smoothnumlevels                                         = 25;
+    jac->ilutype                                                 = -1;
     jac->eu_level                                                = 0;
     jac->eu_droptolerance                                        = 0;
     jac->eu_bj                                                   = 0;
