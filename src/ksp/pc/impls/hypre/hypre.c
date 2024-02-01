@@ -863,7 +863,12 @@ static PetscErrorCode PCSetFromOptions_HYPRE_BoomerAMG(PC pc, PetscOptionItems *
       PetscCallExternal(HYPRE_BoomerAMGSetILUType, jac->hsolver, 30);
       PetscCallExternal(HYPRE_BoomerAMGSetILULevel, jac->hsolver, 0);
       PetscCallExternal(HYPRE_BoomerAMGSetILUTriSolve, jac->hsolver, 0);
-      PetscCallExternal(HYPRE_BoomerAMGSetILULocalReordering, jac->hsolver, 0);
+      PetscCallExternal(HYPRE_BoomerAMGSetILULocalReordering, jac->hsolver, 1);
+      PetscCallExternal(hypre_BoomerAMGSetMaxLevels, jac->hsolver, 25);
+      PetscCallExternal(hypre_BoomerAMGSetInterpType, jac->hsolver, 8);
+      PetscCallExternal(hypre_BoomerAMGSetCoarsenType, jac->hsolver, 8);
+      PetscCallExternal(hypre_BoomerAMGSetCycleType, jac->hsolver, 1);
+      PetscCallExternal(hypre_BoomerAMGSetFCycle, jac->hsolver, 0);
     }
 
   }
